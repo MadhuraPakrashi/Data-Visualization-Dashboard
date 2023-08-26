@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        .chart-container {
+            width: 80%;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.5.0/chart.min.js"></script>
+    <title>Dashboard</title>
+</head>
+<body>
+    <div>
+        <label for="endYear">End Year:</label>
+        <select id="endYear" onchange="updateChart()">
+            <option value="">All</option>
+        </select>
+    </div>
+    <div>
+        <label for="topics">Topics:</label>
+        <select id="topics" onchange="updateChart()">
+            <option value="">All</option>
+        </select>
+    </div>
+    <div class="chart-container">
+        <canvas id="barChart"></canvas>
+    </div>
+    <div class="chart-container">
+        <canvas id="intensityVsLikelihoodChart"></canvas>
+    </div>
+
+    <script>
+        $(document).ready(function () {
+
+            $.get('/get_end_years', function (endYears) {
+                const endYearSelect = document.getElementById('endYear');
+                endYears.forEach(function (year) {
+                    const option = document.createElement('option');
+                    option.value = year;
+                    option.text = year;
+                    endYearSelect.appendChild(option);
+                });
+            });
+
+            $.get('/get_topics', function (topics) {
+                const topicsSelect = document.getElementById('topics');
+                topics.forEach(function (topic) {
+                    const option = document.createElement('option');
+                    option.value = topic;
+                    option.text = topic;
+                    topicsSelect.appendChild(option);
+                });
+            });
+
+
+            updateChart();
+        });
+
+        function updateChart() {
+            const selectedEndYear = document.getElementById('endYear').value;
+            const selectedTopic = document.getElementById('topics').value;
+
+            $.get('/get_data', function (data) {
+
+                const filteredData = data.filter(item => {
+                    return (!selectedEndYear || item.year === selectedEndYear) &&
+                           (!selectedTopic || item.topic === selectedTopic);
+
+                });
+
+
+                const dataByCountry = {};
+
+                filteredData.forEach(function (item) {
+                    if (!dataByCountry[item.country]) {
+                        dataByCountry[item.country] = { intensity: 0, likelihood: 0, relevance: 0 };
+                    }
+                    dataByCountry[item.country].intensity += item.intensity;
+                    dataByCountry[item.country].likelihood += item.likelihood;
+                    dataByCountry[item.country].relevance += item.relevance;
+                });
+
+                const ctx1 = document.getElementById('barChart').getContext('2d');
+                new Chart(ctx1, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(dataByCountry),
+                        datasets: [
+                            {
+                                label: 'Intensity',
+                                data: Object.keys(dataByCountry).map(country => dataByCountry[country].intensity),
+                                backgroundColor: 'rgba(0, 255, 0, 0.5)'
+                            },
+                            {
+                                label: 'Likelihood',
+                                data: Object.keys(dataByCountry).map(country => dataByCountry[country].likelihood),
+                                backgroundColor: 'rgba(255, 99, 132, 0.5)'
+                            },
+                            {
+                                label: 'Relevance',
+                                data: Object.keys(dataByCountry).map(country => dataByCountry[country].relevance),
+                                backgroundColor: 'rgba(54, 162, 235, 0.5)'
+                            }
+                        ]
+                    },
+                    options: {
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Country Data'
+                            }
+                        },
+                        scales: {
+                            x: {
+                                stacked: true,
+                                title: {
+                                    display: true,
+                                    text: 'Countries'
+                                }
+                            },
+                            y: {
+                                stacked: true,
+                                title: {
+                                    display: true,
+                                    text: 'Value'
+                                }
+                            }
+                        }
+                    }
+                });
+
+                const ctx2 = document.getElementById('intensityVsLikelihoodChart').getContext('2d');
+                new Chart(ctx2, {
+                    type: 'scatter',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'Intensity vs. Likelihood',
+                                data: filteredData.map(item => ({ x: item.intensity, y: item.likelihood })),
+                                backgroundColor: 'rgba(0, 128, 0, 0.5)',
+                                borderColor: 'rgba(0, 128, 0, 1)',
+                                pointRadius: 5,
+                                pointHoverRadius: 7
+                            }
+                        ]
+                    },
+                    options: {
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Intensity vs. Likelihood Scatter Plot'
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Intensity'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Likelihood'
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+        }
+    </script>
+</body>
+</html>
+
+
